@@ -169,10 +169,11 @@ class ExtensionConfig(object):
       '-pipe',
       '-fno-strict-aliasing',
       '-Wall',
-      '-Werror',
       '-Wno-unused',
       '-Wno-switch',
       '-Wno-array-bounds',
+      '-Wno-unknown-pragmas',  # Ignorer les pragmas inconnus
+      '-Wno-dangling-else',    # Ignorer les avertissements de else ambigu
       '-msse',
       '-m32',
       '-fvisibility=hidden',

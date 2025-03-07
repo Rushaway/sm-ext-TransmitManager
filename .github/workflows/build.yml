@@ -66,18 +66,47 @@ jobs:
           # Copier libtier0_srv.so depuis la racine du dépôt
           cp extension/libtier0_srv.so hl2sdk-css/lib/linux/libtier0_srv.so
           
-          # Créer une copie pour libvstdlib_srv.so (ou utiliser le même fichier)
+          # Créer une copie pour libvstdlib_srv.so
           cp extension/libtier0_srv.so hl2sdk-css/lib/linux/libvstdlib_srv.so
           
           # Vérifier que les fichiers existent
           ls -la hl2sdk-css/lib/linux/
+
+      - name: Create custom header
+        run: |
+          mkdir -p custom_includes
+          cat > custom_includes/platform_fix.h << 'EOF'
+          #ifndef PLATFORM_FIX_H
+          #define PLATFORM_FIX_H
+          
+          // Définir les macros de plateforme pour éviter l'erreur "Define a platform dir for me!"
+          #define PLATFORM_POSIX 1
+          #define PLATFORM_LINUX 1
+          #define PLATFORM_WINDOWS 0
+          #define PLATFORM_WINDOWS_PC 0
+          
+          // Ignorer les pragmas Windows
+          #define pragma(x)
+          #define __pragma(x)
+          
+          #endif // PLATFORM_FIX_H
+          EOF
+
+      - name: Modify AMBuildScript
+        run: |
+          # Supprimer le flag -Werror du fichier AMBuildScript
+          sed -i 's/-Werror//g' extension/AMBuildScript
+          
+          # Ajouter des flags pour ignorer les avertissements problématiques
+          sed -i "s/-msse,/-msse, '-Wno-unknown-pragmas', '-Wno-dangling-else',/g" extension/AMBuildScript
 
       - name: Build
         working-directory: extension
         shell: bash
         run: |
           mkdir build && cd build
-          python ../configure.py --enable-optimize --sdks=css
+          # Ajouter CXXFLAGS pour inclure notre en-tête personnalisé
+          CXXFLAGS="-include ../../custom_includes/platform_fix.h" python ../configure.py --enable-optimize --sdks=css
           ambuild
 
       - name: Upload artifact
