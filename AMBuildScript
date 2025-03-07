@@ -392,8 +392,7 @@ class ExtensionConfig(object):
     dynamic_libs = []
     if builder.target_platform == 'linux':
       if sdk.name == 'css':
-        # Pour CSS, on va simplement utiliser des noms de fichiers standard
-        # et laisser le système de build gérer les liens symboliques
+        # Utiliser les bibliothèques standard pour CSS
         dynamic_libs = ['libtier0_srv.so', 'libvstdlib_srv.so']
       elif sdk.name in ['hl2dm', 'dods', 'tf2', 'sdk2013', 'bms', 'nucleardawn', 'l4d2', 'insurgency', 'doi']:
         dynamic_libs = ['libtier0_srv.so', 'libvstdlib_srv.so']
@@ -418,15 +417,8 @@ class ExtensionConfig(object):
 
       def make_linker(source_path, output_path):
         def link(context, binary):
-          # Créer un fichier vide si le fichier source n'existe pas
-          if not os.path.exists(source_path):
-            # Créer un fichier vide directement
-            with open(output_path, 'w') as f:
-              pass
-            return output_path
-          else:
-            cmd_node, (output,) = context.AddSymlink(source_path, output_path)
-            return output
+          cmd_node, (output,) = context.AddSymlink(source_path, output_path)
+          return output
         return link
 
       linker = make_linker(source_path, output_path)

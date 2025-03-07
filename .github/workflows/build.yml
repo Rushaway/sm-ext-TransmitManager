@@ -58,11 +58,19 @@ jobs:
           fetch-depth: 99999
           path: extension
 
-      - name: Prepare CSS SDK
+      - name: Prepare CSS SDK libraries
         run: |
+          # Créer le dossier lib/linux s'il n'existe pas
           mkdir -p hl2sdk-css/lib/linux
-          touch hl2sdk-css/lib/linux/libtier0_srv.so
-          touch hl2sdk-css/lib/linux/libvstdlib_srv.so
+          
+          # Copier libtier0_srv.so depuis la racine du dépôt
+          cp extension/libtier0_srv.so hl2sdk-css/lib/linux/libtier0_srv.so
+          
+          # Créer une copie pour libvstdlib_srv.so (ou utiliser le même fichier)
+          cp extension/libtier0_srv.so hl2sdk-css/lib/linux/libvstdlib_srv.so
+          
+          # Vérifier que les fichiers existent
+          ls -la hl2sdk-css/lib/linux/
 
       - name: Build
         working-directory: extension
