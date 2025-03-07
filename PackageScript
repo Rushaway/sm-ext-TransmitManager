@@ -2,15 +2,12 @@
 import os
 
 # This is where the files will be output to
-# package is the default
 builder.SetBuildFolder('package')
 
 # Add any folders you need to this list
 folder_list = [
   'addons/sourcemod/extensions',
   'addons/sourcemod/scripting/include',
-  #'addons/sourcemod/gamedata',
-  #'addons/sourcemod/configs',
 ]
 
 # Create the distribution folder hierarchy.
@@ -28,11 +25,18 @@ def CopyFiles(src, dest, files):
     source_path = os.path.join(builder.sourcePath, src, source_file)
     builder.AddCopy(source_path, dest_entry)
 
-# Include files 
+# Include files
 CopyFiles('.', 'addons/sourcemod/scripting/include',
   [ 'TransmitManager.inc' ]
 )
 
-# Copy binaries.
+# Copy binaries - avec correction pour éviter les duplications
+copied_files = set()
 for cxx_task in Extension.extensions:
-  builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions'])
+  binary_path = os.path.normpath(cxx_task.binary)
+  # Extraire juste le nom du fichier sans le chemin
+  binary_name = os.path.basename(binary_path)
+  # Vérifier si nous avons déjà copié ce fichier
+  if binary_name not in copied_files:
+    builder.AddCopy(cxx_task.binary, folder_map['addons/sourcemod/extensions'])
+    copied_files.add(binary_name)
