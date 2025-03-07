@@ -1,112 +1,105 @@
-name: Build
+name: CI
 
 on: [push, pull_request, workflow_dispatch] 
 
 jobs:
   build:
-    name: Build for CSS on Ubuntu
-    runs-on: ubuntu-20.04
+    name: Build
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-20.04]
+        sourcemod-version: [1.12-dev]
+        python-version: ['3.11']
+        include:
+          - os: ubuntu-20.04
+            sdks: 'css'
 
     steps:
-      - name: Setup Python
-        uses: actions/setup-python@v2
+      - name: Install Linux packages
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt update
+          sudo apt install -yq --no-install-recommends g++-multilib
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
         with:
-          python-version: 3.9
+          python-version: ${{ matrix.python-version }}
 
-      - name: Install AMBuild 2
-        run: |
-          python -m pip install --upgrade pip
-          pip install git+https://github.com/alliedmodders/ambuild
-
-      - name: Install dependencies
-        run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib
-
-      - name: Checkout MetaMod
+      - name: Checkout
         uses: actions/checkout@v4
         with:
-            repository: alliedmodders/metamod-source
-            path: metamod-source
-            submodules: recursive
+          path: extension
 
       - name: Checkout SourceMod
         uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
-          ref: 1.12-dev
+          ref: ${{ matrix.sourcemod-version }}
           path: sourcemod
           submodules: recursive
 
-      - name: Checkout hl2sdk-css
-        uses: actions/checkout@v4
-        with:
-          repository: alliedmodders/hl2sdk
-          ref: css
-          path: hl2sdk-css
-
-      - name: Checkout Project
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 99999
-          path: extension
-
-      - name: Prepare CSS SDK libraries
+      - name: Install AMBuild
         run: |
-          # Créer le dossier lib/linux s'il n'existe pas
-          mkdir -p hl2sdk-css/lib/linux
-          
-          # Copier libtier0_srv.so depuis la racine du dépôt
-          cp extension/libtier0_srv.so hl2sdk-css/lib/linux/libtier0_srv.so
-          
-          # Créer une copie pour libvstdlib_srv.so
-          cp extension/libtier0_srv.so hl2sdk-css/lib/linux/libvstdlib_srv.so
-          
-          # Vérifier que les fichiers existent
-          ls -la hl2sdk-css/lib/linux/
+          python -m pip install wheel
+          pip install git+https://github.com/alliedmodders/ambuild
 
-      - name: Create simple configure.py
+      - name: Install sourcemod dependencies
         run: |
-          cat > extension/configure.py << 'EOF'
-          #!/usr/bin/env python
-          import sys
-          import os
-
-          try:
-              from ambuild2 import run
-          except ImportError:
-              sys.stderr.write('AMBuild 2 is required. Please install it from https://github.com/alliedmodders/ambuild\n')
-              sys.exit(1)
-
-          # Simple extensions don't need to modify this file.
-          run.PrepareBuild(sourcePath=os.path.dirname(os.path.abspath(__file__)),
-                          builder='AMBuildScript',
-                          buildPath=os.path.join('build', 'AMBuild'))
-          EOF
-          chmod +x extension/configure.py
-
-      - name: Modify AMBuildScript
-        run: |
-          # Supprimer le flag -Werror du fichier AMBuildScript
-          sed -i 's/-Werror//g' extension/AMBuildScript
-          
-          # Ajouter des flags pour ignorer les avertissements problématiques
-          sed -i "s/-msse,/-msse, '-Wno-unknown-pragmas', '-Wno-dangling-else',/g" extension/AMBuildScript
-          
-          # Ajouter des définitions pour résoudre le problème de plateforme
-          sed -i "s/'GNUC',/'GNUC', 'PLATFORM_POSIX=1', 'PLATFORM_LINUX=1', 'PLATFORM_WINDOWS=0',/g" extension/AMBuildScript
+          bash sourcemod/tools/checkout-deps.sh -m -s "${{ matrix.sdks }}"
 
       - name: Build
         working-directory: extension
         shell: bash
+        env:
+          BREAKPAD_SYMBOL_SERVER: ${{ secrets.BREAKPAD_SYMBOL_SERVER }}
         run: |
-          python configure.py
-          cd build
+          mkdir build && cd build
+          python ../configure.py --enable-optimize --symbol-files --sdks="${{ matrix.sdks }}"
           ambuild
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: TransmitManager-CSS-Linux
+          name: ${{ runner.os }}
           path: extension/build/package
+
+  release:
+    name: Release
+    if: startsWith(github.ref, 'refs/tags/')
+    needs: build
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download artifacts
+        uses: actions/download-artifact@v4
+
+      - name: Package
+        run: |
+          version=`echo $GITHUB_REF | sed "s/refs\/tags\///"`
+          ls -Rall
+          if [ -d "./Linux/" ]; then
+            cd ./Linux/
+            tar -czf ../${{ github.event.repository.name }}-${version}-linux.tar.gz -T <(\ls -1)
+            cd -
+          fi
+          if [ -d "./macOS/" ]; then
+            cd ./macOS/
+            tar -czf ../${{ github.event.repository.name }}-${version}-mac.tar.gz -T <(\ls -1)
+            cd -
+          fi
+          if [ -d "./Windows/" ]; then
+            cd ./Windows/
+            tar -czf ../${{ github.event.repository.name }}-${version}-windows.tar.gz -T <(\ls -1)
+            cd -
+          fi
+
+      - name: Release
+        uses: svenstaro/upload-release-action@v2
+        with:
+          repo_token: ${{ secrets.GITHUB_TOKEN }}
+          file: '*.tar.gz'
+          tag: ${{ github.ref }}
+          file_glob: true

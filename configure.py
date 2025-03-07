@@ -1,66 +1,39 @@
-#!/usr/bin/env python
+# vim: set ts=2 sw=2 tw=99 noet:
 import sys
-import os
-
 try:
-    from ambuild2 import run
-    from ambuild2.frontend import app_main
+	from ambuild2 import run, util
 except:
-    try:
-        import ambuild
-        sys.stderr.write('AMBuild 1 is no longer supported. Please upgrade to AMBuild 2.\n')
-    except:
-        sys.stderr.write('AMBuild must be installed to build this project.\n')
-    sys.exit(1)
+	try:
+		import ambuild
+		sys.stderr.write('It looks like you have AMBuild 1 installed, but this project uses AMBuild 2.\n')
+		sys.stderr.write('Upgrade to the latest version of AMBuild to continue.\n')
+	except:
+		sys.stderr.write('AMBuild must be installed to build this project.\n')
+		sys.stderr.write('http://www.alliedmods.net/ambuild\n')
+	sys.exit(1)
 
-def make_objdir_name(p):
-    return 'obj-' + p.target_platform + '-' + p.target_arch
+# Hack to show a decent upgrade message, which wasn't done until 2.2.
+ambuild_version = getattr(run, 'CURRENT_API', '2.1')
+if ambuild_version.startswith('2.1'):
+	sys.stderr.write("AMBuild 2.2 or higher is required; please update\n")
+	sys.exit(1)
 
-def run_configure(args):
-    # Utiliser l'API app_main pour configurer le build
-    app = app_main.App(args)
-    
-    # Ajouter les options de ligne de commande
-    app.add_argument('--sdks', type=str, default='all', help='Liste des SDKs à utiliser (all, css, tf2, l4d2, etc.)')
-    app.add_argument('--hl2sdk-root', type=str, default=None, help='Chemin racine pour les HL2SDKs')
-    app.add_argument('--mms-path', type=str, default=None, help='Chemin vers Metamod:Source')
-    app.add_argument('--sm-path', type=str, default=None, help='Chemin vers SourceMod')
-    app.add_argument('--enable-debug', action='store_const', const='1', dest='debug', help='Activer le mode debug')
-    app.add_argument('--enable-optimize', action='store_const', const='1', dest='opt', help='Activer les optimisations')
-    app.add_argument('--no-color', action='store_false', default=True, dest='color', help='Désactiver la sortie colorée')
-    app.add_argument('--disable-auto-versioning', action='store_true', default=False, dest='disable_auto_versioning', help='Désactiver la génération automatique de version')
-    
-    # Configurer le build
-    app.configure_logging()
-    app.default_build_folder = make_objdir_name
-    
-    # Exécuter la configuration
-    builder = app.create_build_objects()
-    builder.options.sdks = getattr(app.args, 'sdks', 'all').split(',')
-    builder.options.hl2sdk_root = app.args.hl2sdk_root
-    builder.options.mms_path = app.args.mms_path
-    builder.options.sm_path = app.args.sm_path
-    builder.options.debug = app.args.debug
-    builder.options.opt = app.args.opt
-    builder.options.color = app.args.color
-    builder.options.disable_auto_versioning = app.args.disable_auto_versioning
-    
-    # Configurer les chemins par défaut si non spécifiés
-    if not builder.options.hl2sdk_root:
-        builder.options.hl2sdk_root = os.path.join('..', 'hl2sdk-css')
-    if not builder.options.mms_path:
-        builder.options.mms_path = os.path.join('..', 'metamod-source')
-    if not builder.options.sm_path:
-        builder.options.sm_path = os.path.join('..', 'sourcemod')
-    
-    # Vérifier si CSS est dans la liste des SDKs
-    if 'all' in builder.options.sdks:
-        builder.options.sdks = ['css']
-    elif 'css' not in builder.options.sdks:
-        builder.options.sdks = ['css']
-    
-    # Générer le script de build
-    app.generate(builder, os.path.join(os.path.dirname(__file__), 'AMBuildScript'))
+parser = run.BuildParser(sourcePath = sys.path[0], api='2.2')
 
-if __name__ == '__main__':
-    run_configure(sys.argv)
+parser.options.add_argument('--hl2sdk-root', type=str, dest='hl2sdk_root', default=None,
+		                   help='Root search folder for HL2SDKs')
+parser.options.add_argument('--mms-path', type=str, dest='mms_path', default=None,
+                       help='Path to Metamod:Source')
+parser.options.add_argument('--sm-path', type=str, dest='sm_path', default=None,
+                       help='Path to SourceMod')
+parser.options.add_argument('--enable-debug', action='store_const', const='1', dest='debug',
+                       help='Enable debugging symbols')
+parser.options.add_argument('--enable-optimize', action='store_const', const='1', dest='opt',
+                       help='Enable optimization')
+parser.options.add_argument('-s', '--sdks', default='all', dest='sdks',
+                       help='Build against specified SDKs; valid args are "all", "present", or '
+                            'space-delimited list of engine names (default: %default)')
+parser.options.add_argument('--targets', type=str, dest='targets', default=None,
+		                      help="Override the target architecture (use commas to separate multiple targets).")
+
+parser.Configure()
