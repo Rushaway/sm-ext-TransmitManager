@@ -104,8 +104,9 @@ jobs:
         working-directory: extension
         shell: bash
         run: |
-          mkdir build && cd build
-          python ../configure.py --enable-optimize --sdks=css
+          mkdir -p build
+          cd build
+          python ../configure.py
           ambuild
 
       - name: Upload artifact
