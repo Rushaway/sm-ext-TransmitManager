@@ -1,36 +1,20 @@
 name: Build
 
-on:
-  push:
-    branches: [ master ]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build:
-
-    name: Build on ${{ matrix.os_short }}
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      fail-fast: false
-      matrix:
-        os:
-          - ubuntu-18.04
-          - windows-latest
-        include:
-          - os: ubuntu-18.04
-            os_short: linux
-          - os: windows-latest
-            os_short: windows
+    name: Build for CSS on Ubuntu
+    runs-on: ubuntu-20.04
 
     steps:
-
       - name: Setup Python
         uses: actions/setup-python@v2
         with:
           python-version: 3.9
 
       - name: Checkout AMBuild
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/ambuild
           path: ambuild
@@ -40,66 +24,36 @@ jobs:
         with:
           packages: ./ambuild
 
-      - name: Install dependencies (Linux)
-        if: runner.os == 'Linux'
+      - name: Install dependencies
         run: |
           sudo dpkg --add-architecture i386
           sudo apt-get update
-          sudo apt-get install -y gcc-multilib g++-multilib llvm-10 clang-10
-
-      - name: Select clang compiler (Linux)
-        if: runner.os == 'Linux'
-        run: |
-          echo "CC=clang" >> $GITHUB_ENV
-          echo "CXX=clang++" >> $GITHUB_ENV
-          clang --version
-          clang++ --version
-
-      - name: Find Visual C++ compilers and make all environment variables global (Windows)
-        if: runner.os == 'Windows'
-        shell: cmd
-        run: |
-          :: See https://github.com/microsoft/vswhere/wiki/Find-VC
-          for /f "usebackq delims=*" %%i in (`vswhere -latest -property installationPath`) do (
-            call "%%i"\Common7\Tools\vsdevcmd.bat -arch=x86 -host_arch=x64
-          )
-
-          :: Loop over all environment variables and make them global.
-          for /f "delims== tokens=1,2" %%a in ('set') do (
-            echo>>"%GITHUB_ENV%" %%a=%%b
-          )
+          sudo apt-get install -y gcc-multilib g++-multilib
 
       - name: Checkout MetaMod
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
             repository: alliedmodders/metamod-source
             path: metamod-source
             submodules: recursive
 
       - name: Checkout SourceMod
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/sourcemod
-          ref: 1.11-dev
+          ref: 1.12-dev
           path: sourcemod
           submodules: recursive
 
-      - name: Checkout hl2sdk-csgo
-        uses: actions/checkout@v2
+      - name: Checkout hl2sdk-css
+        uses: actions/checkout@v4
         with:
           repository: alliedmodders/hl2sdk
-          ref: csgo
-          path: hl2sdk-csgo
-
-      - name: Checkout hl2sdk-insurgency
-        uses: actions/checkout@v2
-        with:
-          repository: alliedmodders/hl2sdk
-          ref: insurgency
-          path: hl2sdk-insurgency
+          ref: css
+          path: hl2sdk-css
 
       - name: Checkout Project
-        uses: actions/checkout@v2
+        uses: actions/checkout@v4
         with:
           fetch-depth: 99999
           path: extension
@@ -109,11 +63,11 @@ jobs:
         shell: bash
         run: |
           mkdir build && cd build
-          python ../configure.py --enable-optimize --sdks=csgo
+          python ../configure.py --enable-optimize --sdks=css
           ambuild
 
       - name: Upload artifact
-        uses: actions/upload-artifact@v2
+        uses: actions/upload-artifact@v4
         with:
-          name: ${{ runner.os }}
+          name: TransmitManager-CSS-Linux
           path: extension/build/package
