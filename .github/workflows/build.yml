@@ -58,6 +58,12 @@ jobs:
           fetch-depth: 99999
           path: extension
 
+      - name: Prepare CSS SDK
+        run: |
+          mkdir -p hl2sdk-css/lib/linux
+          touch hl2sdk-css/lib/linux/libtier0_srv.so
+          touch hl2sdk-css/lib/linux/libvstdlib_srv.so
+
       - name: Build
         working-directory: extension
         shell: bash
