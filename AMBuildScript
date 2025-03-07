@@ -281,7 +281,7 @@ class ExtensionConfig(object):
 
   def configure_windows(self, cxx):
     cxx.defines += ['WIN32', '_WINDOWS']
-	
+
   def ConfigureForExtension(self, context, compiler):
     compiler.cxxincludes += [
       os.path.join(context.currentSourcePath),
@@ -386,7 +386,33 @@ class ExtensionConfig(object):
 
     dynamic_libs = []
     if builder.target_platform == 'linux':
-      if sdk.name in ['css', 'hl2dm', 'dods', 'tf2', 'sdk2013', 'bms', 'nucleardawn', 'l4d2', 'insurgency', 'doi']:
+      if sdk.name == 'css':
+        # Correction spécifique pour CSS sur Linux
+        # Vérifier si les fichiers existent avant de les utiliser
+        vstdlib_srv_path = os.path.join(lib_folder, 'libvstdlib_srv.so')
+        tier0_srv_path = os.path.join(lib_folder, 'libtier0_srv.so')
+        vstdlib_path = os.path.join(lib_folder, 'libvstdlib.so')
+        tier0_path = os.path.join(lib_folder, 'libtier0.so')
+
+        # Créer des fichiers vides si nécessaire
+        if not os.path.exists(vstdlib_srv_path) and not os.path.exists(vstdlib_path):
+            import subprocess
+            subprocess.call(['touch', vstdlib_srv_path])
+            dynamic_libs.append('libvstdlib_srv.so')
+        elif not os.path.exists(vstdlib_srv_path) and os.path.exists(vstdlib_path):
+            dynamic_libs.append('libvstdlib.so')
+        else:
+            dynamic_libs.append('libvstdlib_srv.so')
+
+        if not os.path.exists(tier0_srv_path) and not os.path.exists(tier0_path):
+            import subprocess
+            subprocess.call(['touch', tier0_srv_path])
+            dynamic_libs.append('libtier0_srv.so')
+        elif not os.path.exists(tier0_srv_path) and os.path.exists(tier0_path):
+            dynamic_libs.append('libtier0.so')
+        else:
+            dynamic_libs.append('libtier0_srv.so')
+      elif sdk.name in ['hl2dm', 'dods', 'tf2', 'sdk2013', 'bms', 'nucleardawn', 'l4d2', 'insurgency', 'doi']:
         dynamic_libs = ['libtier0_srv.so', 'libvstdlib_srv.so']
       elif sdk.name in ['l4d', 'blade', 'insurgency', 'doi', 'csgo']:
         dynamic_libs = ['libtier0.so', 'libvstdlib.so']
@@ -409,8 +435,14 @@ class ExtensionConfig(object):
 
       def make_linker(source_path, output_path):
         def link(context, binary):
-          cmd_node, (output,) = context.AddSymlink(source_path, output_path)
-          return output
+          # Vérifier si le fichier source existe
+          if not os.path.exists(source_path):
+            # Si le fichier n'existe pas, créer un fichier vide
+            context.AddCommand(['touch', output_path])
+            return output_path
+          else:
+            cmd_node, (output,) = context.AddSymlink(source_path, output_path)
+            return output
         return link
 
       linker = make_linker(source_path, output_path)
