@@ -105,8 +105,7 @@ jobs:
         shell: bash
         run: |
           mkdir build && cd build
-          # Ajouter CXXFLAGS pour inclure notre en-tête personnalisé
-          CXXFLAGS="-include ../../custom_includes/platform_fix.h" python ../configure.py --enable-optimize --sdks=css
+          python ../configure.py --enable-optimize --sdks=css
           ambuild
 
       - name: Upload artifact
